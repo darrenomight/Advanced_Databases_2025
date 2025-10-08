@@ -171,4 +171,182 @@ ROW_NUMBER() OVER (PARTITION BY DEPTNO ORDER BY SAL DESC) AS RANKING
 FROM EMP
 ORDER BY DEPTNO, SAL DESC;
        
+--Excercise 3
+DROP TABLE countries_ext;
 
+CREATE TABLE countries_ext (
+   country_code     VARCHAR2(5),
+   country_name     VARCHAR2(50),
+   country_language VARCHAR2(50)
+)
+ORGANIZATION EXTERNAL 
+(
+  TYPE ORACLE_LOADER
+  DEFAULT DIRECTORY EXT_TAB_DATA
+  ACCESS PARAMETERS 
+  (
+    RECORDS DELIMITED BY NEWLINE
+    FIELDS TERMINATED BY ','
+    MISSING FIELD VALUES ARE NULL 
+    (
+      country_code CHAR(5),
+      country_name CHAR(50),
+      country_language CHAR(50)
+    )
+  ) 
+  LOCATION ('Countries1.txt','Countries2.txt')
+)
+PARALLEL 5 
+REJECT LIMIT UNLIMITED;
+
+Select * FROM countries_ext;
+SELECT * FROM countries_ext WHERE country_language = 'English';
+
+--Section 4 JSON
+create table departments_json (
+  department_id   integer not null primary key,
+  department_data blob not null
+);
+
+alter table departments_json
+  add constraint dept_data_json 
+  check ( department_data is json );
+
+insert into departments_json 
+  values ( 110, utl_raw.cast_to_raw ( '{
+  "department": "Accounting",
+  "employees": [
+    {
+      "name": "Higgins, Shelley",
+      "job": "Accounting Manager",
+      "hireDate": "2002-06-07T00:00:00"
+    },
+    {
+      "name": "Gietz, William",
+      "job": "Public Accountant",
+      "hireDate": "2002-06-07T00:00:00"
+    }
+  ]
+}' ));
+
+update departments_json
+set    department_data = json_mergepatch ( 
+         department_data,
+         '{
+           "department" : "Finance and Accounting"
+         }'
+       )
+where  department_id = 110 ;
+
+update departments_json
+set    department_data = json_mergepatch ( 
+         department_data,
+         '{ "employees" :
+  [ {
+      "name" : "Gietz, William",
+      "job" : "Public Accountant",
+      "hireDate" : "2002-06-07T00:00:00"
+    },
+    {
+      "name" : "Higgins, Shelley",
+      "job" : "Accounting Manager",
+      "hireDate" : "2002-06-07T00:00:00"
+    },
+    {
+      "name" : "Chen, John",
+      "job" : "Accountant",
+      "hireDate" : "2005-09-28T00:00:00"
+    },
+    {
+      "name" : "Greenberg, Nancy",
+      "job" : "Finance Manager",
+      "hireDate" : "2002-08-17T00:00:00"
+    },
+    {
+      "name" : "Urman, Jose Manuel",
+      "job" : "Accountant",
+      "hireDate" : "2006-03-07T00:00:00"
+    }
+  ]
+}'
+       )
+where  department_id = 110 ;
+
+--OLD METHOD ABOVE NEW METHOD BELOW
+update departments_json  
+set    department_data = json_transform (
+  department_data, 
+  replace '$.department' = 'Finance and Accounting'
+)
+where  department_id = 110;
+
+update departments_json  
+set    department_data = json_transform (
+  department_data, 
+  insert '$.employees[last+1]' = (
+    select d.department_data.employees[0]
+    from   departments_json d  
+    where  department_id = 100 
+  )
+)
+where  department_id = 110;
+
+update departments_json d
+   set
+   department_data = json_transform(department_data,
+               replace '$.employees' =(
+      select json_arrayagg(employee)
+        from(
+         select *
+           from
+            json_table(d.department_data,
+               '$.employees[*]'
+               columns(
+                  employee json path '$[*]'
+               )
+            )
+         union all
+         select employee
+           from departments_json j
+         cross apply
+            json_table(j.department_data,
+                       '$.employees[*]'
+               columns(
+                  employee json path '$[*]'
+               )
+            )
+          where department_id = 100
+      )
+   ))
+where  department_id = 110;
+
+update departments_json  
+set    department_data = json_transform (
+  department_data, 
+  remove '$.employees'
+)
+where  department_id = 100;
+
+update departments_json d
+set    department_data = json_transform (
+  department_data, 
+  replace '$.employees' = (
+     select json_arrayagg ( employee ) from (
+       select * from json_table (
+         d.department_data, '$.employees[*]'
+         columns ( employee json path '$[*]' )
+       )
+       union all
+       select employee from departments_json j
+       cross apply json_table (
+         j.department_data, '$.employees[*]'
+         columns ( employee json path '$[*]' )
+       )
+       where  department_id = 100
+    )
+  ),
+  replace '$.department' = 'Finance and Accounting'
+)
+where  department_id = 110;
+
+--https://blogs.oracle.com/sql/post/how-to-store-query-and-create-json-documents-in-oracle-database
