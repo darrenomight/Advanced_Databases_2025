@@ -194,7 +194,7 @@ set autotrace off;
 pause
 
 -- Autotrace on TRACEONLY STATISTICS
-set autotrace on TRACEONLY STATISTICS
+set autotrace on TRACEONLY;
 select prod_id, max(amount)
 from   stores_v2 st,
        customers_v2 c,
