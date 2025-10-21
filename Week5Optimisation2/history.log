@@ -1,0 +1,68 @@
+ffca8387-ada3-408d-8879-00f6f442bfca:1760452946898:0:F:create table customer as select rownum cid, 'customer '||rownum descr \nfrom dual connect by level <= 100000;
+09031874-d67d-4cb6-b243-c000757e6e76:1760452947088:0:F:alter table customer add primary key (cid);
+30f26876-ff69-4d36-a73f-9a16d70aa92d:1760452947465:0:F:create table store as select rownum sid, 'store '||rownum descr \nfrom dual connect by level <= 100000;
+a09e2744-e635-4298-934b-a9f094eb5e1b:1760452947581:0:F:alter table store add primary key (sid);
+1baabcb9-d970-4e90-afa1-96aa7b16cd1a:1760452947870:0:F:create table taxcode as select rownum tid, 'taxcode '||rownum descr \nfrom dual connect by level <= 100000;
+d7387a29-81f1-49bc-b3f0-efac6e568273:1760452947991:0:F:alter table taxcode add primary key (tid);
+c1160f15-3bb6-459e-9563-5dbf868b3325:1760452948135:0:F:create sequence txnseq;
+fdadfce4-ec79-4a20-9106-070fca24be64:1760452948223:0:S:pause
+f523cc87-955a-4f7f-a4ab-e73398b0fca4:1760452949243:0:F:create table sales \n( txn_id int default txnseq.nextval not null ,\n pid int not null references product(pid),\n cid int not null references customer(cid),\n sid int not null references store(sid),\n tid int not null references taxcode(tid),\n discount varchar2(1) not null,\n amount number(10,2) not null,\n qty number(10) not null,\n constraint chk1 check ( discount in ('Y','N')), \n constraint chk2 check ( amount > 0),\n constraint chk3 check ( qty > 0) );
+4ee3da4b-3b52-48ff-99d9-0520995177a4:1760452949458:0:F:alter table sales add primary key ( txn_id ) \nusing index global partition by hash ( txn_id ) partitions 8;
+8e310e71-09d5-4a86-a876-8f32b1e82466:1760452949525:0:S:pause
+5b442159-abcd-427c-bdda-314214f8c3ce:1760452949666:17:S:drop table if exists hammer_log;
+73e02df3-3a3c-490b-a4b7-5fa96c491fbc:1760452949817:18:S:create table hammer_log ( job int, ela interval day to second );
+52e06876-7adc-487c-a72a-390086ce40d3:1760452954681:80:S:CREATE or REPLACE procedure hammer_time is\n   p sys.odcinumberlist := sys.odcinumberlist(); \n   c sys.odcinumberlist := sys.odcinumberlist(); \n   s sys.odcinumberlist := sys.odcinumberlist();\n  t sys.odcinumberlist := sys.odcinumberlist();\n\n    timer timestamp; \nBEGIN\n   select trunc(dbms_random.value(1,100000)) bulk collect into p \n   from dual connect by level <= 32000; \n\n   select trunc(dbms_random.value(1,100000)) bulk collect into c \n   from dual connect by level <= 32000; \n\n   select trunc(dbms_random.value(1,100000)) bulk collect into s \n   from dual connect by level <= 32000; \n\n   select trunc(dbms_random.value(1,100000)) bulk collect into t \n   from dual connect by level <= 32000; \n\n   timer := localtimestamp; \n\n   -- do lots of work\n   for j in 1 .. 3 loop \n      for i in 1 .. 32000 loop \n         insert into sales ( pid,cid,sid,tid,discount,amount,qty) \n         values (p(i), c(i), s(i), t(i), 'Y',i,i); \n         commit; \n      end loop; \n   end loop; \n\n   insert into hammer_log \n   values ( sys_context('USERENV','BG_JOB_ID'), localtimestamp-timer); \n\n   commit; \nEND; \n/
+14db1cf6-abcb-4a31-a9bc-699cab8b8cc3:1760452954953:0:S:pause
+81436ce4-ff6a-4030-bb4d-ff064076723a:1760452955016:11:S:delete from hammer_log;
+d9b14fed-0f12-4e83-92fd-2ed8be773c30:1760452955277:105:S:declare \n   j int; \nbegin \n   for i in 1 .. 12 loop \n      dbms_job.submit(j,'hammer_time;'); \n   end loop; \n   commit; \nend; \n/
+54836d44-e88e-4605-abfd-1ea1240fa7ac:1760452955583:0:S:pause
+95b7ec6d-e860-4ff3-8ffa-7a6dd3d52b3d:1760452955765:20:S:select * from hammer_log;
+d1720939-8036-4bd5-91b5-5c8d09681dc1:1760452955855:0:S:pause
+8a53924c-3913-412c-b0a8-14061edb9874:1760452955991:7:S:select * from hammer_log;
+b88cc5a5-782f-4fc2-b716-627699bb571a:1760452956047:0:S:pause
+63d4e30f-a8bf-4043-8ed0-b47cd38d49ec:1760452956152:5:S:select * from hammer_log;
+8048330e-3f4c-417c-8151-43c706638e52:1760452956214:0:S:pause
+130f926a-acf3-47bf-af4a-e7eadab9cf1d:1760452956329:5:S:select * from hammer_log;
+8a560cf9-9ee6-4296-be09-b3f4b30acbad:1760452956405:0:S:pause
+496e0aee-8bdf-4208-9f32-d761e1ae8fba:1760452956523:6:S:select * from hammer_log;
+2204e8ea-6c37-4a6d-a1ad-59858c884104:1760452956579:0:S:pause
+e5270ecf-6fa9-400b-919a-86c1a604a1f0:1760452956690:6:S:select * from hammer_log;
+05f9422d-1f4f-470f-9b6c-7ee55f92d2f9:1760452956752:0:S:pause
+ae0f91bb-4a0e-41cb-8ad8-5cd31ced1d9b:1760452956871:5:S:select * from hammer_log;
+85ac399b-a1f6-4135-b150-d0167da823a0:1760452956931:0:S:pause
+630dabc9-ffae-4c40-895b-648045d33634:1760452957082:0:S:select count(*)*96000 / extract(second from max(ela)) \nfrom hammer_log;
+5fba9a3a-da7b-4527-a729-25e3736ba506:1760452957217:9:S:select max(ela) from hammer_log;
+96b5497c-8a59-46a6-b80a-156c208d45b3:1760452957291:10:S:select avg(ela) from hammer_log;
+1cf7823d-fc10-4067-8840-cd4db563c60c:1760452957406:9:S:select count(*)*96000 / (extract(second from max(ela))) tps \nfrom hammer_log;
+4d950cb2-f216-4631-80cc-9c56db0ea052:1760452957663:0:S:pause
+47c1f6b4-d376-40b0-acc0-8d5dd7918bd2:1760452957740:97:S:drop index if exists sales_ix2;
+41414dbe-cb2a-440f-813e-f5005eecefa4:1760452957915:122:S:drop index if exists sales_ix3;
+1d629ace-6bb7-41dd-b69a-3dc09679bde8:1760452958123:112:S:drop index if exists sales_ix4;
+c55b5d24-8dc7-42ee-9736-f5c77554bce8:1760452958318:0:F:create index sales_ix1 on sales ( pid);
+b17d83f2-5615-448e-b9eb-b1f3ce6d0a41:1760452958426:3524:S:create index sales_ix2 on sales ( sid);
+9a21c8a7-b67d-4b7f-96d4-f863c18acdac:1760452962030:2925:S:create index sales_ix3 on sales ( cid);
+e1731ee5-3277-4bb1-8cfe-e6a9a169b5e2:1760452965048:2768:S:create index sales_ix4 on sales ( tid);
+7f7316bb-9910-4db9-94dd-de29c0e8ae35:1760452967954:0:S:pause
+30741209-dbb3-4119-bb28-7dee3c9e6071:1760452968059:4:S:delete from hammer_log;
+12afa100-3800-492a-bce0-738c43cdd41c:1760452968288:93:S:declare \n   j int; \nbegin \n   for i in 1 .. 12 loop \n      dbms_job.submit(j,'hammer_time;'); \n   end loop; \n   commit; \nend; \n/
+d33b03b9-f602-41a2-b77d-a367c2cb3610:1760452968556:0:S:pause
+121bebce-7b57-4c6a-aa68-79214acb1979:1760452968684:4:S:select * from hammer_log;
+db4e16dc-e30f-4851-a415-d6c9b31c06c3:1760452968744:0:S:pause
+88c616e9-6af8-43f6-8a97-06e161653633:1760452968818:4:S:select * from hammer_log;
+70b4b63f-540d-49b8-a0c1-7b0237900d3c:1760452968884:0:S:pause
+3ff0d381-0b98-4743-9d09-1b1a965a2233:1760452968965:5:S:select * from hammer_log;
+3528ba79-f1fe-4570-801f-7f7e8fd8b631:1760452969030:0:S:pause
+c085d93d-4250-4c9d-9ec6-9906ff6db234:1760452969097:7:S:select * from hammer_log;
+ef654c86-50ac-47f8-a0db-0f309636fd87:1760452969159:0:S:pause
+2399f553-4fc6-4926-87e9-e9e92648b99c:1760452969232:6:S:select * from hammer_log;
+1c69b35e-58d7-411f-94ea-1710f920dda0:1760452969299:0:S:pause
+8c3337c2-23be-4e56-b07e-75fa398aea39:1760452969379:5:S:select * from hammer_log;
+0d85bf61-3412-43d1-a54f-4c7ef55a4f73:1760452969451:0:S:pause
+0e56c2b4-3280-44dc-ad63-29202327281f:1760452969526:8:S:select * from hammer_log;
+21b8fe89-cc15-4f8c-8ad9-4671ffbae235:1760452969601:0:S:pause
+35d928c8-f3ff-479b-805b-ccff23374774:1760452969662:5:S:select * from hammer_log;
+bd851de3-257a-4324-a439-4fd3423d1a6e:1760452969979:6:S:select avg(ela) from hammer_log;
+a825b985-6971-4017-9ff7-60c62d0465be:1760452970218:14:S:select count(*)*96000 / (extract(minute from max(ela))*60)+(extract(second from max(ela))) tps \nfrom hammer_log;
+b3aa4478-589c-47ce-889a-39f3f5474eff:1760452970565:0:S:pause
+f5e4b31d-2e53-4133-b53b-816b6f801cfe:1760453158810:44:S:select * from hammer_log;
+5009a7d9-fe64-4fb2-94c8-c8c4cb490419:1760453363139:112:S:CREATE or REPLACE procedure hammer_time is\n   p sys.odcinumberlist := sys.odcinumberlist(); \n   c sys.odcinumberlist := sys.odcinumberlist(); \n   s sys.odcinumberlist := sys.odcinumberlist();\n  t sys.odcinumberlist := sys.odcinumberlist();\n\n    timer timestamp; \nBEGIN\n   select trunc(dbms_random.value(1,100000)) bulk collect into p \n   from dual connect by level <= 32000; \n\n   select trunc(dbms_random.value(1,100000)) bulk collect into c \n   from dual connect by level <= 32000; \n\n   select trunc(dbms_random.value(1,100000)) bulk collect into s \n   from dual connect by level <= 32000; \n\n   select trunc(dbms_random.value(1,100000)) bulk collect into t \n   from dual connect by level <= 32000; \n\n   timer := localtimestamp; \n\n   -- do lots of work\n   for j in 1 .. 3 loop \n      for i in 1 .. 32000 loop \n         insert into sales ( pid,cid,sid,tid,discount,amount,qty) \n         values (p(i), c(i), s(i), t(i), 'Y',i,i); \n         commit; \n      end loop; \n   end loop; \n\n   insert into hammer_log \n   values ( sys_context('USERENV','BG_JOB_ID'), localtimestamp-timer); \n\n   commit; \nEND; \n/
